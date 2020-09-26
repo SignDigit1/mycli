@@ -9,6 +9,7 @@ const path = require('path');
 // 交互式命令行
 const inquirer = require('inquirer');
 const fs = require('fs-extra');
+const spawn = require('child_process').spawn;
 
 program.usage('<template-name>');
 program.parse(process.argv);
@@ -39,10 +40,25 @@ let question = [
       }
     },
   },
+  {
+    name: 'yarn',
+    type: 'input',
+    message: '是否使用yarn(Y/N)',
+    validate(val) {
+      let v = val.toUpperCase();
+      if (v.includes('Y')) {
+        return true;
+      } else if (v.includes('N')) {
+        return false;
+      } else {
+        return '请输入Y或N';
+      }
+    },
+  },
 ];
 
 inquirer.prompt(question).then(answers => {
-  let { name: projectName } = answers;
+  let { name: projectName, yarn } = answers;
   url = tplObj[templateName];
   console.log(chalk.white('\n Start generating... \n'));
   // 出现加载图标
@@ -57,8 +73,42 @@ inquirer.prompt(question).then(answers => {
     }
     // 结束加载图标
     spinner.succeed();
-    console.log(chalk.green('\n Generation completed!'));
-    console.log('\n To get started');
-    console.log(`\n    cd ${projectName} \n`);
+
+    process.chdir(`./${projectName}`);
+
+    const installSpinner = ora('install...').start();
+
+    //修改package.json
+    const packageUrl = path.resolve(process.cwd(), './package.json');
+    fs.readFile(packageUrl).then(res => {
+      // console.log(res.toString());
+      let package = JSON.parse(res.toString());
+      package.name = projectName;
+      package.version = '1.0.0';
+      fs.writeFile(packageUrl, JSON.stringify(package, null, 2)).then(() => {
+        // 执行依赖安装
+        let cmd = [];
+        if (yarn) {
+          cmd = ['yarn', []];
+        } else {
+          cmd = ['npm', ['install']];
+        }
+        let npm = spawn(...cmd, { shell: true });
+        npm.stdout.on('data', data => {
+          console.log(`stdout: ${data}`);
+        });
+
+        npm.stderr.on('data', data => {
+          console.error(`stderr: ${data}`);
+        });
+
+        npm.on('close', code => {
+          installSpinner.succeed();
+          console.log(chalk.green('\n Generation completed!'));
+          console.log('\n To get started');
+          console.log(`\n cd ${projectName} \n`);
+        });
+      });
+    });
   });
 });
