@@ -1,6 +1,6 @@
 {
   "name": "@signdigit1/mycli",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "cli",
   "main": "index.js",
   "bin": {
